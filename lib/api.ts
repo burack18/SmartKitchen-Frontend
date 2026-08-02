@@ -43,6 +43,14 @@ export interface AddProductRequest {
   expiryDate: string; // ISO string
 }
 
+/** Entry in GET /Product/history/{containerId}. */
+export interface ProductHistoryEntry {
+  id: string;
+  name: string;
+  isActive: boolean;
+  // Other fields may be present but we only need id/name/isActive here.
+}
+
 // ---- Auth types -------------------------------------------------------------
 
 export interface LoginRequest {
@@ -78,7 +86,7 @@ function getAuthToken(): string {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   body?: unknown;
   /** Whether to attach the Authorization header from localStorage. */
   auth?: boolean;
@@ -153,4 +161,20 @@ export function getContainerStatus(): Promise<ContainerStatus> {
 /** Add a product to a container (replaces any existing active product). */
 export function addProduct(payload: AddProductRequest): Promise<unknown> {
   return request<unknown>("/Product", { body: payload, auth: true });
+}
+
+/** Fetch the product history for a container (used to find the active product's id). */
+export function getProductHistory(containerId: string): Promise<ProductHistoryEntry[]> {
+  return request<ProductHistoryEntry[]>(`/Product/history/${containerId}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+/** Delete a product by its id. */
+export function deleteProduct(productId: string): Promise<unknown> {
+  return request<unknown>(`/Product/${productId}`, {
+    method: "DELETE",
+    auth: true,
+  });
 }

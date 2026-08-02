@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ProductStatusCard, {
   type ProductStatus,
 } from "@/components/ProductStatusCard";
-import { getContainerStatus, type ContainerStatus } from "@/lib/api";
+import {
+  ApiError,
+  deleteProduct,
+  getContainerStatus,
+  getProductHistory,
+  type ContainerStatus,
+} from "@/lib/api";
 
 /**
  * Dashboard
@@ -18,9 +25,16 @@ import { getContainerStatus, type ContainerStatus } from "@/lib/api";
  *  - a loading skeleton while fetching,
  *  - or an error state with a retry option.
  *
+ * After the initial load, the status is re-fetched every 10 seconds so the
+ * weight/fill/expiry info stays current as the ESP32 sends new readings.
+ * Polling pauses when the browser tab is hidden and resumes when visible
+ * again. Poll failures are silent (only the initial load can show an error).
+ *
  * A header "Add Product" button is always shown so users can add/replace a
  * product regardless of state.
  */
+
+const POLL_INTERVAL_MS = 10_000;
 
 type LoadState = "loading" | "success" | "error";
 
@@ -28,8 +42,17 @@ export default function DashboardPage() {
   const [status, setStatus] = useState<ContainerStatus | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
 
-  // Used by the retry button (a user event, so synchronous setState is fine).
-  function fetchStatus() {
+  // Active product's id (fetched from product history) — needed for delete.
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+
+  // Delete confirmation dialog state.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  // Manual retry from the error state (a user event, so synchronous setState
+  // is fine). Resets to the loading state and re-fetches.
+  function handleRetry() {
     setLoadState("loading");
     getContainerStatus()
       .then((data) => {
@@ -41,11 +64,110 @@ export default function DashboardPage() {
       });
   }
 
-  // Initial load on mount. Initial state is already "loading", so we only
-  // set state inside the async callbacks (avoiding synchronous setState in
-  // the effect body, which can trigger cascading renders).
+  // When the container has an active product, fetch the product history to
+  // get the active product's id (needed for the delete endpoint). This runs
+  // whenever the status changes and a product is present.
+  useEffect(() => {
+    if (!status?.containerId || !status.productName) {
+      setActiveProductId(null);
+      return;
+    }
+    let active = true;
+    getProductHistory(status.containerId)
+      .then((history) => {
+        if (!active) return;
+        const entry = history.find((p) => p.isActive);
+        setActiveProductId(entry?.id ?? null);
+      })
+      .catch(() => {
+        // Non-critical: delete just won't be available if this fails.
+        if (active) setActiveProductId(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [status?.containerId, status?.productName]);
+
+  // Open the delete confirmation dialog.
+  function handleDeleteClick() {
+    setDeleteError("");
+    setDeleteOpen(true);
+  }
+
+  // Confirm delete: call DELETE /Product/{id}, then refresh the status.
+  async function handleDeleteConfirm() {
+    if (!activeProductId) {
+      setDeleteError("Could not identify the product to delete.");
+      return;
+    }
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteProduct(activeProductId);
+      setDeleteOpen(false);
+      // Refresh the container status so the dashboard shows the empty state.
+      getContainerStatus()
+        .then((data) => {
+          setStatus(data);
+          setLoadState("success");
+        })
+        .catch(() => {
+          // Silent: the next poll will retry.
+        });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError("Failed to delete product, please try again.");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // Initial load + background polling with Page Visibility awareness.
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setInterval> | null;
+
+    function poll() {
+      getContainerStatus()
+        .then((data) => {
+          if (active) {
+            setStatus(data);
+            setLoadState("success");
+          }
+        })
+        .catch(() => {
+          // Silent failure on background polls.
+        });
+    }
+
+    function startPolling() {
+      if (timer) return;
+      timer = setInterval(poll, POLL_INTERVAL_MS);
+    }
+
+    function stopPolling() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        // Refresh immediately when returning to the tab, then resume polling.
+        poll();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    }
+
+    // Initial load. Initial state is already "loading", so we only set state
+    // inside the async callbacks (avoiding synchronous setState in the effect
+    // body, which can trigger cascading renders).
     getContainerStatus()
       .then((data) => {
         if (active) {
@@ -56,8 +178,14 @@ export default function DashboardPage() {
       .catch(() => {
         if (active) setLoadState("error");
       });
+
+    startPolling();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       active = false;
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -104,13 +232,38 @@ export default function DashboardPage() {
 
       {loadState === "loading" && <LoadingSkeleton />}
 
-      {loadState === "error" && <ErrorState onRetry={fetchStatus} />}
+      {loadState === "error" && <ErrorState onRetry={handleRetry} />}
 
       {loadState === "success" && hasActiveProduct && productStatus && (
-        <ProductStatusCard product={productStatus} />
+        <ProductStatusCard
+          product={productStatus}
+          onDelete={handleDeleteClick}
+        />
       )}
 
       {loadState === "success" && !hasActiveProduct && <EmptyState />}
+
+      {/* Delete confirmation modal */}
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete product"
+        description={
+          <>
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-stone-800">
+              {status?.productName}
+            </span>
+            ? This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        loading={deleting}
+        error={deleteError}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+      />
     </div>
   );
 }
