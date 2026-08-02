@@ -5,11 +5,49 @@
   --foreground: #171717;
 }
 
+/*
+ * SmartKitchen theme tokens
+ * --------------------------
+ * Eco-friendly green palette (sustainability / recycling) paired with warm
+ * kitchen tones (cream cards, terracotta accent used sparingly).
+ *
+ * The `eco` scale is the primary brand color (fresh herb green). `terracotta`
+ * is a small warm accent for contrast. `cream` is used for foreground cards.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Eco / herb green — primary brand + accents */
+  --color-eco-50: #f1f8f1;
+  --color-eco-100: #dcecdc;
+  --color-eco-200: #bcdabf;
+  --color-eco-300: #8fc297;
+  --color-eco-400: #5fa56b;
+  --color-eco-500: #3f8a4e;
+  --color-eco-600: #2f6f3c;
+  --color-eco-700: #275831;
+  --color-eco-800: #214729;
+  --color-eco-900: #1c3a23;
+
+  /* Terracotta — warm kitchen accent, used sparingly */
+  --color-terracotta-50: #fbf3ee;
+  --color-terracotta-100: #f4e0d3;
+  --color-terracotta-200: #e8c2ac;
+  --color-terracotta-300: #d99d7d;
+  --color-terracotta-400: #c97f56;
+  --color-terracotta-500: #b8663c;
+  --color-terracotta-600: #a05530;
+  --color-terracotta-700: #83442a;
+  --color-terracotta-800: #6c3926;
+  --color-terracotta-900: #5a3122;
+
+  /* Cream — warm foreground for cards */
+  --color-cream-50: #fdfcf8;
+  --color-cream-100: #faf6ec;
+  --color-cream-200: #f3ecdb;
 }
 
 @media (prefers-color-scheme: dark) {

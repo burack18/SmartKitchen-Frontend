@@ -9,13 +9,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-eco-400 disabled:cursor-not-allowed disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-orange-500 text-white shadow-sm hover:bg-orange-600 active:bg-orange-700",
+    "bg-eco-600 text-white shadow-sm hover:bg-eco-700 active:bg-eco-800",
   secondary:
-    "bg-white text-orange-700 border border-orange-200 hover:bg-orange-50",
+    "bg-cream-50 text-eco-700 border border-eco-200 hover:bg-eco-50",
 };
 
 export default function Button({

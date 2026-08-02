@@ -68,7 +68,7 @@ function LoginForm() {
           Don{"'"}t have an account?{" "}
           <Link
             href="/signup"
-            className="font-semibold text-orange-600 hover:text-orange-700 hover:underline"
+            className="font-semibold text-eco-700 hover:text-eco-800 hover:underline"
           >
             Sign up
           </Link>

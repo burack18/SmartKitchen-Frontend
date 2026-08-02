@@ -25,10 +25,10 @@ export default function Input({
       </label>
       <input
         id={inputId}
-        className={`w-full rounded-xl border bg-white px-4 py-3 text-base text-stone-900 placeholder:text-stone-400 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+        className={`w-full rounded-xl border bg-white px-4 py-3 text-base text-stone-900 placeholder:text-stone-400 transition-colors focus:outline-none focus:ring-2 focus:ring-eco-400 ${
           hasError
             ? "border-red-400 focus:ring-red-400"
-            : "border-stone-200 hover:border-stone-300"
+            : "border-stone-200 hover:border-eco-300"
         } ${className}`}
         aria-invalid={hasError}
         aria-describedby={hasError ? `${inputId}-error` : undefined}
