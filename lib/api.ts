@@ -21,6 +21,28 @@ export class ApiError extends Error {
   }
 }
 
+// ---- Container / Product types ---------------------------------------------
+
+/** Response from GET /Container/status. Fields are nullable when empty. */
+export interface ContainerStatus {
+  containerId: string;
+  currentWeight: number | null;
+  fillPercentage: number | null;
+  productName: string | null;
+  expiryDate: string | null;
+  daysUntilExpiry: number | null;
+  isEmpty: boolean;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
+}
+
+/** Body for POST /Product. */
+export interface AddProductRequest {
+  containerId: string;
+  name: string;
+  expiryDate: string; // ISO string
+}
+
 // ---- Auth types -------------------------------------------------------------
 
 export interface LoginRequest {
@@ -44,17 +66,41 @@ export interface SignupRequest {
   password: string;
 }
 
-// ---- Core request helper ----------------------------------------------------
+// ---- Core request helpers ---------------------------------------------------
 
-async function request<T>(path: string, body: unknown): Promise<T> {
+/** Read the auth token from localStorage (saved at login). Returns "" if missing. */
+function getAuthToken(): string {
+  try {
+    return localStorage.getItem("token") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+interface RequestOptions {
+  method?: "GET" | "POST";
+  body?: unknown;
+  /** Whether to attach the Authorization header from localStorage. */
+  auth?: boolean;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { method = "POST", body, auth = false } = options;
   const url = `${BASE_URL}${path}`;
+
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (auth) {
+    const token = getAuthToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
 
   let res: Response;
   try {
     res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     // Network error / server unreachable / TLS issue.
@@ -90,9 +136,21 @@ async function request<T>(path: string, body: unknown): Promise<T> {
 // ---- Auth endpoints ---------------------------------------------------------
 
 export function login(payload: LoginRequest): Promise<LoginResponse> {
-  return request<LoginResponse>("/Auth/login", payload);
+  return request<LoginResponse>("/Auth/login", { body: payload });
 }
 
 export function signup(payload: SignupRequest): Promise<unknown> {
-  return request<unknown>("/Auth/signup", payload);
+  return request<unknown>("/Auth/signup", { body: payload });
+}
+
+// ---- Container / Product endpoints ------------------------------------------
+
+/** Fetch the current container status (active product + fill info). */
+export function getContainerStatus(): Promise<ContainerStatus> {
+  return request<ContainerStatus>("/Container/status", { method: "GET", auth: true });
+}
+
+/** Add a product to a container (replaces any existing active product). */
+export function addProduct(payload: AddProductRequest): Promise<unknown> {
+  return request<unknown>("/Product", { body: payload, auth: true });
 }
